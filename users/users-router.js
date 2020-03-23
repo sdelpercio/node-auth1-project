@@ -4,7 +4,7 @@ const UserDb = require('./users-model');
 
 const router = express.Router();
 
-router.get('/users', (req, res) => {
+router.get('/users', restricted, (req, res) => {
 	UserDb.findAll()
 		.then(users => {
 			res.status(200).json(users);
@@ -28,6 +28,32 @@ router.post('/register', (req, res) => {
 });
 router.post('/login', (req, res) => {
 	const { username, password } = req.body;
+
+	UserDb.findBy({ username })
+		.then(([user]) => {
+			if (user && bcrypt.compareSync(password, user.password)) {
+				const id = user.id;
+				const username = user.username;
+				req.session.user = {
+					id: user.id,
+					username: user.username
+				};
+				res.status(200).json({ id, username, message: 'logged in!' });
+			} else {
+				res.status(401).json({ message: 'Invalid credentials.' });
+			}
+		})
+		.catch(err => {
+			res.status(500).json({ error: 'Issue signing in user', err });
+		});
 });
+
+function restricted(req, res, next) {
+	if (req.session && req.session.user) {
+		next();
+	} else {
+		res.status(401).json({ message: 'wrong' });
+	}
+}
 
 module.exports = router;
